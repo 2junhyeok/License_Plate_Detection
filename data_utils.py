@@ -82,11 +82,23 @@ def json_to_label(plate_json_path, phase):
     img_size = img.size # img size가 다름
     
     # normalize
-    n_bbox_lst = [bbox_center_normalize(x, img_size) for x in bbox_lst]
+    if phase=="train":
+        n_bbox_lst = [bbox_center_normalize(x, img_size) for x in bbox_lst]
+    elif phase=="test":
+        n_bbox_lst=[]
+        for i in bbox_lst:
+            x,y,w,h,_,_= bbox_normalize(i, img_size)
+            n_bbox_lst.append((x,y,w,h))
+        #n_bbox_lst = [bbox_normalize(x, img_size) for x in bbox_lst]
+    else:
+        raise ValueError
 
     return n_bbox_lst # list
 
 def label_preprocess(save_path, plate_json_path, phase):
+    '''
+    hi
+    '''
     cnt = 1
     class_num = 0
     label_path_lst = glob.glob(plate_json_path+"/*/*/*.json")
@@ -94,14 +106,14 @@ def label_preprocess(save_path, plate_json_path, phase):
         n_bbox_lst = json_to_label(label_path, phase)
         txt_path = save_path+f"/labels/image{cnt}.txt"
         if cnt ==1:
-        with open(txt_path, "w") as file:
-            for i, n_bbox in enumerate(n_bbox_lst):
-                if i==len(n_bbox_lst)-1:
-                    data = f"{class_num} {n_bbox[0]} {n_bbox[1]} {n_bbox[2]} {n_bbox[3]}" # 마지막 bbox는 enter 제거
-                else:
-                    data = f"{class_num} {n_bbox[0]} {n_bbox[1]} {n_bbox[2]} {n_bbox[3]}\n"
-                file.write(data)
-            cnt +=1
+            with open(txt_path, "w") as file:
+                for i, n_bbox in enumerate(n_bbox_lst):
+                    if i==len(n_bbox_lst)-1:
+                        data = f"{class_num} {n_bbox[0]} {n_bbox[1]} {n_bbox[2]} {n_bbox[3]}" # 마지막 bbox는 enter 제거
+                    else:
+                        data = f"{class_num} {n_bbox[0]} {n_bbox[1]} {n_bbox[2]} {n_bbox[3]}\n"
+                    file.write(data)
+                cnt +=1
 
 
 if __name__=="__main__":
@@ -111,4 +123,4 @@ if __name__=="__main__":
     save_path = f"/mnt/hdd_6tb/jh2020/processed_{phase}"
 
     label_preprocess(save_path, plate_json_path, phase = phase)
-    image_preprocess(save_path, plate_image_path)
+    #image_preprocess(save_path, plate_image_path)
