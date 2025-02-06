@@ -6,49 +6,80 @@ import glob
 from ultralytics import YOLO
 
 
-def pred_to_xyxwyh(result):
+def pred_to_xyxyw(result):
+    '''
+    xyxy,xywh -> xyxyw
+    '''
     xywh_tensor = result.boxes.xywh
     xyxy_tensor = result.boxes.xyxy
     lst = []
     for i in zip(xywh_tensor, xyxy_tensor):
-        new = torch.Tensor((i[0][0],i[0][1],i[0][2]+i[1][2],i[0][1]+i[1][3]))
+        new = torch.Tensor((i[0][0],i[0][1],i[0][2]+i[1][2],i[0][1]+i[1][3],i[0][2]))
         lst.append(new)
     return lst
 
-def label_to_xyxwyh(label):
+def label_to_xyxyw(label):
+    '''
+    xywh -> xyxyw
+    '''
     lst = []
     for i in label:
-        new = torch.Tensor((i[0],i[1],i[0]+i[2],i[1]+i[3]))
+        new = torch.Tensor((i[0],i[1],i[0]+i[2],i[1]+i[3],i[2]))
         lst.append(new)
     return lst
 
-def cos_sim(A: torch.tensor,B: torch.tensor)->torch.tensor:
+def cos_sim(A: np.ndarray,B: np.ndarray)->np.ndarray:
     dot_product = A @ B.T
-    norm = np.linalg.norm(A, axis=1, keepdims=True)@np.linalg.norm(B, axis=1, keepdims=True).T
-    return dot_product/norm
+    norm_A = np.linalg.norm(A, axis=1)[:,np.newaxis]
+    norm_B = np.linalg.norm(B, axis=1)[np.newaxis,:]
+    sim_mat = dot_product/(norm_A @ norm_B)
+    return sim_mat
 
-def matching():
-    pass
 
-def IoU():
-    pass
+def matching(A: np.ndarray,B: np.ndarray, threshold=0)-> list:
+    '''
+    cosine similarity matrix to matching list
+    :param 'A': YOLO's result
+    :param 'B': ground truth .txt
+    '''
+    gt_lst = []
+    pred_lst = []
+    tmp_mat = cos_sim(A,B) # rank mat
+    while tmp_mat.max() > threshold:
+        i,j = np.where(tmp_mat==tmp_mat.max())
+        i,j = i[0],j[0]
+        
+        tmp_mat[i,:] = 0
+        tmp_mat[:,j] = 0
+        gt_lst.append(A[i.item()].tolist())
+        pred_lst.append(B[j.item()].tolist())
+    return gt_lst, pred_lst # matching list
+
+
 
 def eval(img_path,gt_path, model):
     '''
     img_path, model -> pred
-    pred, label -> cos sim
-    cos sim -> IoU
-    IoU -> recall score
+    gt, pred -> matching
+    matcing -> recall score
     '''
     img_path_lst = glob.glob(img_path+'/**/*.png', recursive=True)
     gt_path_lst = glob.glob(gt_path+'**/*.txt', recursive=True)
     img_path_lst = natsort.natsorted(img_path_lst)
     gt_path_lst = natsort.natsorted(gt_path_lst)
     
-    for img_path in img_path_lst:
+    for img_path, gt_path in img_path_lst, gt_path_lst:
         img = Image.open(img_path)
         result = model(img, save=True)
         
+        with open(gt_path) as gt_lst:
+            lst = [list(map(float, line.split()[1:])) for line in gt_lst]
+        
+        A = result.numpy()
+        B = np.array(lst)
+        
+        gt, pred = matching(A, B)
+        ######
         
 
 if __name__=="__main__":
@@ -66,7 +97,7 @@ if __name__=="__main__":
     gt_tensor = torch.tensor(lst)
 
     
-    A = pred_tensor.to('cpu')
-    B = gt_tensor.to('cpu')
+    A = pred_tensor.numpy()
+    B = np.array(gt_tensor)
     
     
