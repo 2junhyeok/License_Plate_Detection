@@ -96,9 +96,6 @@ def json_to_label(plate_json_path, phase):
     return n_bbox_lst # list
 
 def label_preprocess(save_path, plate_json_path, phase):
-    '''
-    hi
-    '''
     cnt = 1
     class_num = 0
     label_path_lst = glob.glob(plate_json_path+"/*/*/*.json")
@@ -123,4 +120,4 @@ if __name__=="__main__":
     save_path = f"/mnt/hdd_6tb/jh2020/processed_{phase}"
 
     label_preprocess(save_path, plate_json_path, phase = phase)
-    #image_preprocess(save_path, plate_image_path)
+    image_preprocess(save_path, plate_image_path)
