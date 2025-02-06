@@ -36,7 +36,7 @@ def cos_sim(A: np.ndarray,B: np.ndarray)->np.ndarray:
     return sim_mat
 
 
-def matching(A: np.ndarray,B: np.ndarray, threshold=0)-> list:
+def matching(A: np.ndarray,B: np.ndarray, threshold=0.95)-> list:
     '''
     cosine similarity matrix to matching list
     :param 'A': YOLO's result
@@ -53,7 +53,7 @@ def matching(A: np.ndarray,B: np.ndarray, threshold=0)-> list:
         tmp_mat[:,j] = 0
         gt_lst.append(A[i.item()].tolist())
         pred_lst.append(B[j.item()].tolist())
-    return gt_lst, pred_lst # matching list
+    return pred_lst, gt_lst# matching list
 
 
 
@@ -68,36 +68,30 @@ def eval(img_path,gt_path, model):
     img_path_lst = natsort.natsorted(img_path_lst)
     gt_path_lst = natsort.natsorted(gt_path_lst)
     
-    for img_path, gt_path in img_path_lst, gt_path_lst:
+    TP = 0
+    TP_FN = 0
+    for img_path, gt_path in zip(img_path_lst, gt_path_lst):
         img = Image.open(img_path)
         result = model(img, save=True)
         
         with open(gt_path) as gt_lst:
             lst = [list(map(float, line.split()[1:])) for line in gt_lst]
         
-        A = result.numpy()
-        B = np.array(lst)
+        A = result[0].numpy() #! pred 
+        B = np.array(lst) # gt
         
-        gt, pred = matching(A, B)
-        ######
+        pred_lst, _ = matching(A, B)
+        TP += len(pred_lst)
+        TP_FN += len(B)
+    return TP/TP_FN
+        
+        
+        
         
 
 if __name__=="__main__":
     test_img_path = "/mnt/hdd_6tb/jh2020/processed_test/images"
     test_label_path = "/mnt/hdd_6tb/jh2020/processed_test/labels" # gt
-    save_pred_bbox_path = "/mnt/hdd_6tb/jh2020/processed_test/pred"
     model = YOLO("/mnt/hdd_6tb/jh2020/runs/detect/train28/weights/best.pt")
     
-    
-    tst = "/mnt/hdd_6tb/jh2020/processed_test/images/image1.png"
-    result = model(tst, save = True)
-    
-    
-    pred_tensor = result[0]
-    gt_tensor = torch.tensor(lst)
-
-    
-    A = pred_tensor.numpy()
-    B = np.array(gt_tensor)
-    
-    
+    eval(test_img_path, test_label_path, model)
