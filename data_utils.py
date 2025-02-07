@@ -89,7 +89,6 @@ def json_to_label(plate_json_path, phase):
         for i in bbox_lst:
             x,y,w,h,_,_= bbox_normalize(i, img_size)
             n_bbox_lst.append((x,y,w,h))
-        #n_bbox_lst = [bbox_normalize(x, img_size) for x in bbox_lst]
     else:
         raise ValueError
 
