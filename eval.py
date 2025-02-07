@@ -79,10 +79,14 @@ def eval(img_path,gt_path, model):
         
         A = pred_to_xyxyw(result[0])
         B = label_to_xyxyw(lst)
-        
-        pred_lst, _ = matching(A, B)
-        TP += len(pred_lst)
-        TP_FN += len(B)
+        try:
+            pred_lst, _ = matching(A, B)
+            TP += len(pred_lst)
+            TP_FN += len(B)
+        except:# num_pred==0 or num_ground truth==0
+            print(f"num_pred: {len(pred_lst)}")
+            print(f"num_ground truth: {len(B)}")
+            pass
     return TP/TP_FN
         
         
