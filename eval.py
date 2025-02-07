@@ -14,9 +14,9 @@ def pred_to_xyxyw(result):
     xyxy_tensor = result.boxes.xyxy
     lst = []
     for i in zip(xywh_tensor, xyxy_tensor):
-        new = torch.Tensor((i[0][0],i[0][1],i[0][2]+i[1][2],i[0][1]+i[1][3],i[0][2]))
+        new = torch.Tensor((i[0][0],i[0][1],i[0][2]+i[1][2],i[0][1]+i[1][3],i[0][2])).to('cpu').numpy()
         lst.append(new)
-    return lst
+    return np.array(lst)
 
 def label_to_xyxyw(label):
     '''
@@ -24,9 +24,9 @@ def label_to_xyxyw(label):
     '''
     lst = []
     for i in label:
-        new = torch.Tensor((i[0],i[1],i[0]+i[2],i[1]+i[3],i[2]))
+        new = torch.Tensor((i[0],i[1],i[0]+i[2],i[1]+i[3],i[2])).to('cpu').numpy()
         lst.append(new)
-    return lst
+    return np.array(lst)
 
 def cos_sim(A: np.ndarray,B: np.ndarray)->np.ndarray:
     dot_product = A @ B.T
@@ -36,7 +36,7 @@ def cos_sim(A: np.ndarray,B: np.ndarray)->np.ndarray:
     return sim_mat
 
 
-def matching(A: np.ndarray,B: np.ndarray, threshold=0.95)-> list:
+def matching(A: np.ndarray,B: np.ndarray, threshold=0.9)-> list:
     '''
     cosine similarity matrix to matching list
     :param 'A': YOLO's result
@@ -77,8 +77,8 @@ def eval(img_path,gt_path, model):
         with open(gt_path) as gt_lst:
             lst = [list(map(float, line.split()[1:])) for line in gt_lst]
         
-        A = result[0].numpy() #! pred 
-        B = np.array(lst) # gt
+        A = pred_to_xyxyw(result[0])
+        B = label_to_xyxyw(lst)
         
         pred_lst, _ = matching(A, B)
         TP += len(pred_lst)
@@ -93,5 +93,5 @@ if __name__=="__main__":
     test_img_path = "/mnt/hdd_6tb/jh2020/processed_test/images"
     test_label_path = "/mnt/hdd_6tb/jh2020/processed_test/labels" # gt
     model = YOLO("/mnt/hdd_6tb/jh2020/runs/detect/train28/weights/best.pt")
-    
-    eval(test_img_path, test_label_path, model)
+
+    print("recall score: ", eval(test_img_path, test_label_path, model))
