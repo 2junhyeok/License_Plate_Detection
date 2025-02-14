@@ -1,6 +1,5 @@
-from PIL import Image
+from PIL import Image, ImageDraw
 import torch
-
 import re
 import os
 from ultralytics import YOLO
@@ -12,23 +11,24 @@ class InferenceQuater:
         self.model = model
         self.x_margin = None
         self.y_margin = None
+        self.img = None
 
     def quater_crop(self, image_path):
         '''
         이미지에 마진을 고려한 4분할을 진행
         '''
-        img = Image.open(image_path)
-        w = img.size[0]
-        h = img.size[1]
+        self.img = Image.open(image_path)
+        w = self.img.size[0]
+        h = self.img.size[1]
         self.x_margin = w*self.margin
         self.y_margin = h*self.margin
         
         w_half = w/2
         h_hlaf = h/2
-        bboxes1 = img.crop((0, 0, w_half+(self.x_margin/2), h_hlaf+(self.y_margin/2)))
-        bboxes2 = img.crop((w_half-(self.x_margin/2), 0, w, h_hlaf+(self.y_margin/2)))
-        bboxes3 = img.crop((0, h_hlaf-(self.x_margin/2), w_half+(self.x_margin/2), h))
-        bboxes4 = img.crop((w_half+(self.x_margin/2), h_hlaf+(self.y_margin/2), w, h))
+        bboxes1 = self.img.crop((0, 0, w_half+(self.x_margin/2), h_hlaf+(self.y_margin/2)))
+        bboxes2 = self.img.crop((w_half-(self.x_margin/2), 0, w, h_hlaf+(self.y_margin/2)))
+        bboxes3 = self.img.crop((0, h_hlaf-(self.x_margin/2), w_half+(self.x_margin/2), h))
+        bboxes4 = self.img.crop((w_half+(self.x_margin/2), h_hlaf+(self.y_margin/2), w, h))
         return bboxes1, bboxes2, bboxes3, bboxes4
 
     def infer_quater(self, *args):
@@ -80,9 +80,30 @@ class InferenceQuater:
     @staticmethod
     def batch_iou(box, boxes):
         '''
-        배치boxes와 단일box간의 IoU 계산
+        배치boxes와 단일box간의 IoU 계산을 좌우(lr) 상하(tb)를 기준으로 계산함
+        Args:
+            box: (4,) (x1, x2, w, h) 형식의 단일 bbox
+            boxes: (N,4) (x1, x2, w, h) 형식의 bbox tensor
+        Return:
+            IoU 텐서(N,)
         '''
-
+        lr = torch.clamp(
+            torch.min(box[0] + box[2], boxes[:, 0] + boxes[:, 2]) -\
+            torch.max(box[0], boxes[:, 0]),
+            min=0
+        )
+        
+        tb = torch. clamp(
+            torch.min(box[1] + box[3], boxes[:, 1] + boxes[:, 3]) -\
+            torch.max(box[1], boxes[:, 1]),
+            min=0
+        )
+        
+        intersection = lr*tb
+        union = box[2]*box[3] + boxes[:, 2]*boxes[:, 3]
+        
+        return intersection/union
+    
     @staticmethod
     def nms(bboxes, threshold=0.2):
         '''
