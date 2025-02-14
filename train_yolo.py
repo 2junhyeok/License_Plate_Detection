@@ -6,7 +6,7 @@ model = YOLO("/mnt/hdd_6tb/jh2020/yolo11n.pt")
 
 # Train the model
 train_results = model.train(
-    data="/mnt/hdd_6tb/kmj9425/yolo_1/yolov11.yaml",
+    data="/mnt/hdd_6tb/jh2020/plateYOLO11n.yaml",
     epochs=50,
     imgsz=640, 
     device=0,
