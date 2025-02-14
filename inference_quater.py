@@ -145,7 +145,7 @@ class InferenceQuater:
         for bbox in bboxes:
             label, score = bbox[4:]
             text = f'{int(label)} {score}'
-            t_w, t_h = ImageFont.getsize(text)
+            t_w, t_h = ImageFont.getsize(text)###
             x1, y1, w, h = bbox[:4]
             x2 = x1+w
             y2 = y1+h
