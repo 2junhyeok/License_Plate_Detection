@@ -3,7 +3,7 @@ import torch
 import re
 import os
 from ultralytics import YOLO
-
+from PIL import ImageFont
 
 class InferenceQuater:
     def __init__(self, margin, model):
@@ -25,13 +25,14 @@ class InferenceQuater:
         
         w_half = w/2
         h_hlaf = h/2
-        bboxes1 = self.img.crop((0, 0, w_half+(self.x_margin/2), h_hlaf+(self.y_margin/2)))
-        bboxes2 = self.img.crop((w_half-(self.x_margin/2), 0, w, h_hlaf+(self.y_margin/2)))
-        bboxes3 = self.img.crop((0, h_hlaf-(self.x_margin/2), w_half+(self.x_margin/2), h))
-        bboxes4 = self.img.crop((w_half+(self.x_margin/2), h_hlaf+(self.y_margin/2), w, h))
-        return bboxes1, bboxes2, bboxes3, bboxes4
+        quater1 = self.img.crop((0, 0, w_half+(self.x_margin/2), h_hlaf+(self.y_margin/2)))
+        quater2 = self.img.crop((w_half-(self.x_margin/2), 0, w, h_hlaf+(self.y_margin/2)))
+        quater3 = self.img.crop((0, h_hlaf-(self.y_margin/2), w_half+(self.x_margin/2), h))
+        quater4 = self.img.crop((w_half+(self.x_margin/2), h_hlaf+(self.y_margin/2), w, h))
 
-    def infer_quater(self, *args):
+        return quater1, quater2, quater3, quater4
+
+    def infer_quater(self, args):
         '''
         4개의 분할된 이미지에 대한 batch inference를 진행
         Args:
@@ -39,7 +40,10 @@ class InferenceQuater:
         Returns:
             각 inference를 담은 list
         '''
-        results = self.model(list(args),save=True)
+        lst = []
+        for i in args:
+            lst.append(i)
+        results = self.model(lst, save=True)
 
         return results
 
@@ -61,7 +65,7 @@ class InferenceQuater:
         return bboxes
 
     
-    def scaling(self, *args):
+    def scaling(self, args):
         '''
         원본 이미지 스케일에 맞게 조정
         Args:
@@ -69,11 +73,11 @@ class InferenceQuater:
         '''
         bboxes1, bboxes2, bboxes3, bboxes4 = args
 
-        bboxes2[:,0] -= self.x_margin # x 방향 -margin
-        bboxes3[:,1] -= self.y_margin # y 방향 -margin
+        bboxes2[:,0] += self.img.size[0]/2 -self.x_margin/2 # x 방향 -margin
+        bboxes3[:,1] += self.img.size[1]/2 -self.y_margin/2# y 방향 -margin
         
-        bboxes4[:,0] -= self.x_margin # x 방향 -margin
-        bboxes4[:,1] -= self.y_margin # y 방향 -margin
+        bboxes4[:,0] += self.img.size[0]/2 -self.x_margin/2# x 방향 -margin
+        bboxes4[:,1] += self.img.size[1]/2 -self.y_margin/2# y 방향 -margin
             
         return torch.cat([bboxes1, bboxes2, bboxes3, bboxes4], dim=0)
     
@@ -88,15 +92,15 @@ class InferenceQuater:
             IoU 텐서(N,)
         '''
         lr = torch.clamp(
-            torch.min(box[0] + box[2], boxes[:, 0] + boxes[:, 2]) -\
+            torch.min(box[0] + box[2], boxes[:, 0] + boxes[:, 2]) -
             torch.max(box[0], boxes[:, 0]),
             min=0
         )
         
         tb = torch. clamp(
-            torch.min(box[1] + box[3], boxes[:, 1] + boxes[:, 3]) -\
-            torch.max(box[1], boxes[:, 1]),
-            min=0
+                torch.min(box[1] + box[3], boxes[:, 1] + boxes[:, 3]) -
+                torch.max(box[1], boxes[:, 1]),
+                min=0
         )
         
         intersection = lr*tb
@@ -105,23 +109,23 @@ class InferenceQuater:
         return intersection/union
     
     @staticmethod
-    def nms(bboxes, threshold=0.2):
+    def nms(bboxes, threshold=0.1):
         '''
         IoU를 기준으로 nms 적용
         '''
         if len(bboxes)==0:
             return bboxes
         
-        scores = bboxes[:,5] 
-        order = scores.argsort(descending=True)# ex) [1, 0, 2, 3]
-        keep = torch.ones(len(order), dtype=torch.bool)# True:keep, False:pass
+        scores = bboxes[:,5].to('cuda:0')
+        order = scores.argsort(descending=True).to('cuda:0')# ex) [1, 0, 2, 3]
+        keep = torch.ones(len(order), dtype=torch.bool).to('cuda:0')# True:keep, False:pass
         
         for i in range(len(order)-1):
             if not keep[order[i]]:# score가 높은 bbox부터 들어오도록 order[i] 설계
                 continue
             
             # num_bbox -1 개의 1차원 iou tensor
-            ious = InferenceQuater.batch_iou(bboxes[order[i]], bboxes[order[i+1,:]])
+            ious = InferenceQuater.batch_iou(bboxes[order[i]], bboxes[order[i+1:]])
             keep[order[i+1:]] &= (ious < threshold)# 1 and True인 경우에 1 할당
         
         return bboxes[keep]
@@ -129,9 +133,26 @@ class InferenceQuater:
     def plot(self, bboxes):
         '''
         최종 bbox들을 이미지에 그리기
+        Args:
+            bboxes: bboxes tensor
+        Returns:
+            bbox가 그려진 이미지
         '''
+        img = self.img.copy()
+        bboxes = bboxes.to('cpu').numpy()
         
-        return image
+        draw = ImageDraw.Draw(img)
+        for bbox in bboxes:
+            label, score = bbox[4:]
+            text = f'{int(label)} {score}'
+            t_w, t_h = ImageFont.getsize(text)
+            x1, y1, w, h = bbox[:4]
+            x2 = x1+w
+            y2 = y1+h
+            draw.rectangle((x1, y1, x2, y2), outline="red", width = 2)
+            draw.text((x1+w, y1-t_h), text, font=ImageFont.load_default())
+            
+        return img
     
     def __call__(self, image_path):
         '''
@@ -141,15 +162,15 @@ class InferenceQuater:
         results = self.infer_quater(args)
         bboxes= self.extract_xywh(results)
         bboxes= self.scaling(bboxes)
-        # bboxes= InferenceQuater.nms(bboxes)
-        # image = self.plot(bboxes)
+        bboxes= InferenceQuater.nms(bboxes)
+        image = self.plot(bboxes)
         return image
     
 
 if __name__=="__main__":
     model = YOLO("/mnt/hdd_6tb/jh2020/runs/detect/train28/weights/best.pt")
     custom_model = InferenceQuater(margin=0.1, model=model)
-    for i in image_path_lst:
-        image = custom_model(i)
-        image.save
+    org_img_path = "/mnt/hdd_6tb/jh2020/pred/image32.png"
+    img = custom_model(org_img_path)
+    img.save('test_quater.png', 'png')
     
