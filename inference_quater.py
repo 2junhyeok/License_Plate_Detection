@@ -129,6 +129,13 @@ class InferenceQuater:
             keep[order[i+1:]] &= (ious < threshold)# 1 and True인 경우에 1 할당
         
         return bboxes[keep]
+    
+    @staticmethod
+    def textsize(text, font):
+        img = Image.new(mode="P", size=(0, 0))
+        draw = ImageDraw.Draw(img)
+        _, _, width, height = draw.textbbox((0, 0), text=text, font=font)
+        return width, height
 
     def plot(self, bboxes):
         '''
@@ -140,17 +147,18 @@ class InferenceQuater:
         '''
         img = self.img.copy()
         bboxes = bboxes.to('cpu').numpy()
+        font = ImageFont.load_default(size=30)
         
         draw = ImageDraw.Draw(img)
         for bbox in bboxes:
             label, score = bbox[4:]
-            text = f'{int(label)} {score}'
-            t_w, t_h = ImageFont.getsize(text)###
+            text = f'{int(label)}: {score:.3f}'
+            t_w, t_h = InferenceQuater.textsize(text, font)###
             x1, y1, w, h = bbox[:4]
             x2 = x1+w
             y2 = y1+h
             draw.rectangle((x1, y1, x2, y2), outline="red", width = 2)
-            draw.text((x1+w, y1-t_h), text, font=ImageFont.load_default())
+            draw.text((x1, y1-t_h), text, "red", font)
             
         return img
     
