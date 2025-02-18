@@ -6,34 +6,31 @@ import glob
 import natsort
 import data_utils
 from ultralytics import YOLO
+from dataclasses import dataclass
 from PIL import ImageFont
 
-class InferenceQuater:
-    class boxes:
-        '''
-        YOLO's bbox 출력형식
-            result.boxes.xyxy
-            result.boxes.xywh
-        '''
-        def __init__(self, data):
-            self.data = data
-            self.xyxy = None
-            self.xywh = None
-        
-        def xyxy(self):
-            #self.xyxy = 
-            return self.xyxy
-        
-        def xywh(self):
-            #self.xywh = 
-            return self.xywh
-            
+
+@dataclass
+class Boxes:
+    xyxy: torch.Tensor = None
+    xywh: torch.Tensor = None
+
+@dataclass
+class Result:
+    boxes = Boxes()
+    image = None
+
+class QuaterYOLO:
     def __init__(self, margin, model):
         self.margin = margin
         self.model = model
         self.x_margin = None
         self.y_margin = None
         self.img = None
+        self.boxes = Boxes()
+        
+        self.resized_width = None
+        self.resized_height = None
 
     def quater_crop(self, image_path):
         '''
@@ -50,13 +47,15 @@ class InferenceQuater:
         self.y_margin = h*self.margin
         
         w_half = w/2
-        h_hlaf = h/2
-        quater1 = self.img.crop((0, 0, w_half+(self.x_margin/2), h_hlaf+(self.y_margin/2)))
-        quater2 = self.img.crop((w_half-(self.x_margin/2), 0, w, h_hlaf+(self.y_margin/2)))
-        quater3 = self.img.crop((0, h_hlaf-(self.y_margin/2), w_half+(self.x_margin/2), h))
-        quater4 = self.img.crop((w_half+(self.x_margin/2), h_hlaf+(self.y_margin/2), w, h))
+        h_half = h/2
+        quater1 = self.img.crop((0, 0, w_half+(self.x_margin/2), h_half+(self.y_margin/2)))
+        quater2 = self.img.crop((w_half-(self.x_margin/2), 0, w, h_half+(self.y_margin/2)))
+        quater3 = self.img.crop((0, h_half-(self.y_margin/2), w_half+(self.x_margin/2), h))
+        quater4 = self.img.crop((w_half+(self.x_margin/2), h_half+(self.y_margin/2), w, h))
 
         resized_img = data_utils.image_resize(self.img)
+        self.resized_width = resized_img.size[0]
+        self.resized_height = resized_img.size[1]
         
         return quater1, quater2, quater3, quater4, resized_img
 
@@ -101,17 +100,17 @@ class InferenceQuater:
         '''
         bboxes1, bboxes2, bboxes3, bboxes4, bboxes5 = args
 
-        bboxes2[:,0] += self.img.size[0]/2 -self.x_margin/2# x 방향 -margin
+        bboxes2[:,0] += self.img.size[0]/2 -self.x_margin/2
         
-        bboxes3[:,1] += self.img.size[1]/2 -self.y_margin/2# y 방향 -margin
+        bboxes3[:,1] += self.img.size[1]/2 -self.y_margin/2
         
-        bboxes4[:,0] += self.img.size[0]/2 +self.x_margin/2# x 방향 -margin
-        bboxes4[:,1] += self.img.size[1]/2 +self.y_margin/2# y 방향 -margin
+        bboxes4[:,0] += self.img.size[0]/2 +self.x_margin/2
+        bboxes4[:,1] += self.img.size[1]/2 +self.y_margin/2
         
-        bboxes5[:,0] *= self.img.size[0]/640
-        bboxes5[:,1] *= self.img.size[1]**2/640*self.img.size[0]
-        bboxes5[:,2] *= self.img.size[0]/640
-        bboxes5[:,3] *= self.img.size[1]**2/640*self.img.size[0]
+        bboxes5[:,0] *= self.img.size[0]/self.resized_width
+        bboxes5[:,1] *= self.img.size[1]/self.resized_height
+        bboxes5[:,2] *= self.img.size[0]/self.resized_width
+        bboxes5[:,3] *= self.img.size[1]/self.resized_height
         
         return torch.cat([bboxes1, bboxes2, bboxes3, bboxes4, bboxes5], dim=0)
     
@@ -159,7 +158,7 @@ class InferenceQuater:
                 continue
             
             # num_bbox -1 개의 1차원 iou tensor
-            ious = InferenceQuater.batch_iou(bboxes[order[i]], bboxes[order[i+1:]])
+            ious = QuaterYOLO.batch_iou(bboxes[order[i]], bboxes[order[i+1:]])
             keep[order[i+1:]] &= (ious < threshold)# 1 and True인 경우에 1 할당
         
         return bboxes[keep]
@@ -187,7 +186,7 @@ class InferenceQuater:
         for bbox in bboxes:
             label, score = bbox[4:]
             text = f'{int(label)}: {score:.3f}'
-            t_w, t_h = InferenceQuater.textsize(text, font)###
+            t_w, t_h = QuaterYOLO.textsize(text, font)
             x1, y1, w, h = bbox[:4]
             x2 = x1+w
             y2 = y1+h
@@ -196,7 +195,7 @@ class InferenceQuater:
             
         return img
     
-    def infer(self, image_path):
+    def __call__(self, image_path):
         '''
         최종 처리된 이미지를 return함
         '''
@@ -204,24 +203,32 @@ class InferenceQuater:
         results = self.infer_batch(args)
         bboxes= self.extract_xywh(results)
         bboxes= self.scaling(bboxes)
-        bboxes= InferenceQuater.nms(bboxes)
-        image = self.plot(bboxes)
-        return image
-
-    def __call__(self, image):
-        '''
-        result 와 같은 결과가 나오도록 해야함
-        Args:
-            image: PIL
-        '''
+        bboxes= QuaterYOLO.nms(bboxes)
         
+        result = Result()
+        
+        result.boxes.xyxy = torch.concat(
+            [
+                bboxes[:, :2], 
+                bboxes[:, :2] + bboxes[:, 2:4]
+            ]
+            , dim=1
+        )
+        result.boxes.xywh = torch.concat(
+            [
+                bboxes[:, :2] + bboxes[:, 2:4]/2,
+                bboxes[:, 2:4]
+            ]
+            , dim=1
+        )
+        
+        result.image = self.plot(bboxes)
         return result
-        
     
 
 if __name__=="__main__":
     model = YOLO("/mnt/hdd_6tb/jh2020/runs/detect/tune/weights/best.pt")
-    custom_model = InferenceQuater(margin=0.1, model=model)
+    custom_model = QuaterYOLO(margin=0.1, model=model)
     #org_img_path = "/mnt/hdd_6tb/jh2020/pred/image58.png"
     #img = custom_model.infer(org_img_path)
     #img.save('test_quater.png', 'png')
@@ -230,5 +237,5 @@ if __name__=="__main__":
     save_path = "/mnt/hdd_6tb/jh2020/runs/detect/predict5"
     img_path_lst = glob.glob(img_path+'/**/*.png', recursive=True)
     for i,path in enumerate(natsort.natsorted(img_path_lst)):
-        img = custom_model.infer(path)
-        img.save(f"{save_path}/image{i}.png", "png")
+        result = custom_model(path)
+        result.image.save(f"{save_path}/image{i}.png", "png")
