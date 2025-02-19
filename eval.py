@@ -3,12 +3,13 @@ import numpy as np
 from PIL import Image
 import natsort
 import glob
+from PIL import Image, ImageDraw
 from ultralytics import YOLO
 from inference_quater import QuaterYOLO
 
 device = "cuda:0"
 
-def matching(A: torch.tensor,B: torch.tensor, threshold=0.1):
+def matching(A: torch.tensor,B: torch.tensor, threshold=0.5):
     '''
     iou nms matching list
     Args:
@@ -16,13 +17,11 @@ def matching(A: torch.tensor,B: torch.tensor, threshold=0.1):
         param 'B': ground truth .txt
     '''
     if len(A)>0:# num pred > 0
-        iou_mat = torch.stack([QuaterYOLO.batch_iou(a, B) for a in A], dim=0)
-        '''
+        iou_mat = []
         for a in A:
-            ious = QuaterYOLO.batch_iou(a, B)
-            iou_mat.append(ious)
+            iou_mat.append(QuaterYOLO.batch_iou(a, B))
         iou_mat = torch.stack(iou_mat, dim=0)
-        '''
+
         matched_A = []
         matched_B = []
         
@@ -70,12 +69,13 @@ def eval(img_path,gt_path, model, mode='dev'):
 
             if mode=='base':
                 A = result[0].boxes.xywh.to(device)
+                A = torch.cat([A[:,:2] - A[:,2:]/2, A[:, 2:]], dim=1)# [xc,yc,w,h]->[x1,y1,w,h]
             elif mode=='dev':
                 A = result.boxes.xywh.to(device)
+                A = torch.cat([A[:,:2] - A[:,2:]/2, A[:, 2:]], dim=1)# [xc,yc,w,h]->[x1,y1,w,h]
+            B = torch.stack([torch.tensor(i[:4]) for i in lst], dim=0).to(device)
             
-            A = A[:, :4]
-            B = torch.stack([torch.tensor(i[:4]) for i in lst], dim=0).to(device) # xywh
-
+            
             matched_A, _ = matching(A, B)
             TP += len(matched_A)
             TP_FN += len(B)
@@ -87,5 +87,12 @@ if __name__=="__main__":
     test_img_path = "/mnt/hdd_6tb/jh2020/processed_test/images"
     test_label_path = "/mnt/hdd_6tb/jh2020/processed_test/labels" # gt
     model = YOLO("/mnt/hdd_6tb/jh2020/runs/detect/tune/weights/best.pt")
-    #model = QuaterYOLO(margin=0.1, model=model)
-    print("recall score: ", eval(test_img_path, test_label_path, model, mode='base'))
+    
+    mode = "dev"
+    
+    if mode=="dev":
+        model = QuaterYOLO(margin=0.1, model=model)
+    elif mode=="base":
+        pass
+    
+    print("recall score: ", eval(test_img_path, test_label_path, model, mode=mode))
