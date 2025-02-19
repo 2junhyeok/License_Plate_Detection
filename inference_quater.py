@@ -119,8 +119,8 @@ class QuaterYOLO:
         '''
         배치boxes와 단일box간의 IoU 계산을 좌우(lr) 상하(tb)를 기준으로 계산함
         Args:
-            box: (4,) (x1, x2, w, h) 형식의 단일 bbox
-            boxes: (N,4) (x1, x2, w, h) 형식의 bbox tensor
+            box: (4,) (x1, y1, w, h) 형식의 단일 bbox
+            boxes: (N,4) (x1, y1, w, h) 형식의 bbox tensor
         Return:
             IoU 텐서(N,)
         '''
