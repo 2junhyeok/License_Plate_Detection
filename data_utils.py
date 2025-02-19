@@ -68,10 +68,8 @@ def json_to_label(plate_json_path, phase):
     data = json.load(f)
     bbox_lst = [x["bbox"] for x in data["Learning_Data_Info"]["annotations"][0]["license_plate"]] # bbox가 하나가 아님
     
-    # img size
     if phase == "train":
-        path = plate_json_path.replace("VL","VS")
-        path = path.replace("label","image")
+        path = plate_json_path.replace("02.labeling_data", "01.source_data")  # 경로 수정
         img_path = path.replace(".json",".jpg")
         img = Image.open(img_path)
     elif phase == "test":
@@ -79,11 +77,12 @@ def json_to_label(plate_json_path, phase):
         img_path = path.replace(".json",".jpg")
         img = Image.open(img_path)
         
-    img_size = img.size # img size가 다름
+    img_size = img.size
     
     # normalize
     if phase=="train":
         n_bbox_lst = [bbox_center_normalize(x, img_size) for x in bbox_lst]
+        
     elif phase=="test":
         n_bbox_lst=[]
         for i in bbox_lst:
@@ -98,18 +97,19 @@ def label_preprocess(save_path, plate_json_path, phase):
     cnt = 1
     class_num = 0
     label_path_lst = glob.glob(plate_json_path+"/*/*/*.json")
+    
     for label_path in natsort.natsorted(label_path_lst):
         n_bbox_lst = json_to_label(label_path, phase)
         txt_path = save_path+f"/labels/image{cnt}.txt"
-        if cnt ==1:
-            with open(txt_path, "w") as file:
-                for i, n_bbox in enumerate(n_bbox_lst):
-                    if i==len(n_bbox_lst)-1:
-                        data = f"{class_num} {n_bbox[0]} {n_bbox[1]} {n_bbox[2]} {n_bbox[3]}" # 마지막 bbox는 enter 제거
-                    else:
-                        data = f"{class_num} {n_bbox[0]} {n_bbox[1]} {n_bbox[2]} {n_bbox[3]}\n"
-                    file.write(data)
-                cnt +=1
+
+        with open(txt_path, "w") as file:
+            for i, n_bbox in enumerate(n_bbox_lst):
+                if i==len(n_bbox_lst)-1:
+                    data = f"{class_num} {n_bbox[0]} {n_bbox[1]} {n_bbox[2]} {n_bbox[3]}" # 마지막 bbox는 enter 제거
+                else:
+                    data = f"{class_num} {n_bbox[0]} {n_bbox[1]} {n_bbox[2]} {n_bbox[3]}\n"
+                file.write(data)
+        cnt +=1
 
 
 if __name__=="__main__":
@@ -119,4 +119,4 @@ if __name__=="__main__":
     save_path = f"/mnt/hdd_6tb/jh2020/processed_{phase}"
 
     label_preprocess(save_path, plate_json_path, phase = phase)
-    image_preprocess(save_path, plate_image_path)
+    #image_preprocess(save_path, plate_image_path)
