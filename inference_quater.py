@@ -137,9 +137,10 @@ class QuaterYOLO:
         )
         
         intersection = lr*tb
-        union = box[2]*box[3] + boxes[:, 2]*boxes[:, 3]
+        union = box[2]*box[3] + boxes[:, 2]*boxes[:, 3] - intersection
+        ious = intersection/union
         
-        return intersection/union
+        return ious
     
     @staticmethod
     def nms(bboxes, threshold=0.1):
