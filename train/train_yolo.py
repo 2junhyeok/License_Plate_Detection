@@ -2,7 +2,7 @@ from ultralytics import YOLO
 import os
 
 # Load a model
-model = YOLO("/mnt/hdd_6tb/jh2020/yolo11n.pt")
+model = YOLO("/mnt/hdd_6tb/jh2020/config/yolo11n.pt")
 
 search_space={
     "lr0": (1e-5, 1e-1),
