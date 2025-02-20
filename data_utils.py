@@ -6,6 +6,7 @@ import glob
 import natsort
 import numpy as np
 from PIL import Image
+from tqdm import tqdm
 
 ############### image ###############
 
@@ -62,26 +63,53 @@ def bbox_center_normalize(bbox, img_size):
     
     return xcenter, ycenter, w, h
 
+def standard_label(mixed_lst):
+    '''
+    표준화되지 않은 라벨을 표준화하는 함수
+    Args:
+        mixed_lst: list와 str이 섞여있는 list
+    Returns:
+        [[num, num, ...], ...]
+    '''
+    result = []
+    for item in mixed_lst:
+        if isinstance(item, str):
+            numbers = [float(x) for x in item.strip('[]').split(',')]
+            result.append(numbers)
+        elif isinstance(item, list):
+            result.append(item)
+    return result
+
 def json_to_label(plate_json_path, phase):
     # bbox
     f = open(plate_json_path)
     data = json.load(f)
-    bbox_lst = [x["bbox"] for x in data["Learning_Data_Info"]["annotations"][0]["license_plate"]] # bbox가 하나가 아님
     
-    if phase == "train":
-        path = plate_json_path.replace("02.labeling_data", "01.source_data")  # 경로 수정
-        img_path = path.replace(".json",".jpg")
-        img = Image.open(img_path)
-    elif phase == "test":
-        path = plate_json_path.replace("02.labeling","01.source")
-        img_path = path.replace(".json",".jpg")
-        img = Image.open(img_path)
+    if phase == "train_car":
+        bbox_lst = [x["coord"] for x in data["Learning Data Info"]["annotations"]] # bbox가 하나가 아님
+        path = plate_json_path.replace("image", "label")
+    
+    elif phase == "train" or "test":
+        bbox_lst = [x["bbox"] for x in data["Learning_Data_Info"]["annotations"][0]["license_plate"]] # bbox가 하나가 아님
+
+        if phase == "train":
+            path = plate_json_path.replace("02.labeling_data", "01.source_data")
+        elif phase == "test":
+            path = plate_json_path.replace("02.labeling","01.source")
+    
+    img_path = path.replace(".json",".jpg").replace("label", "image").replace("VL", "VS")
+    img = Image.open(img_path)
         
     img_size = img.size
     
     # normalize
-    if phase=="train":
-        n_bbox_lst = [bbox_center_normalize(x, img_size) for x in bbox_lst]
+    if phase=="train" or "train_car":
+        try:
+            n_bbox_lst = [bbox_center_normalize(x, img_size) for x in bbox_lst]
+        except:
+            bbox_lst = standard_label(bbox_lst)
+            n_bbox_lst = [bbox_center_normalize(x, img_size) for x in bbox_lst]
+        
         
     elif phase=="test":
         n_bbox_lst=[]
@@ -96,9 +124,9 @@ def json_to_label(plate_json_path, phase):
 def label_preprocess(save_path, plate_json_path, phase):
     cnt = 1
     class_num = 0
-    label_path_lst = glob.glob(plate_json_path+"/*/*/*.json")
+    label_path_lst = glob.glob(plate_json_path+"/*/*.json")
     
-    for label_path in natsort.natsorted(label_path_lst):
+    for label_path in tqdm(natsort.natsorted(label_path_lst)):
         n_bbox_lst = json_to_label(label_path, phase)
         txt_path = save_path+f"/labels/image{cnt}.txt"
 
@@ -113,10 +141,10 @@ def label_preprocess(save_path, plate_json_path, phase):
 
 
 if __name__=="__main__":
-    phase = "test"
-    plate_image_path = "/home/yohanban/data/Sample_data/01.source_data/detect_plate/교차로"
-    plate_json_path = "/home/yohanban/data/Sample_data/02.labeling_data/detect_plate/교차로"
-    save_path = f"/mnt/hdd_6tb/jh2020/processed_{phase}"
+    phase = "train_car"# train, test, train_car
+    plate_image_path = "/mnt/hdd_6tb/seungeun/HuNature/data/image/car"
+    plate_json_path = "/mnt/hdd_6tb/seungeun/HuNature/data/label/car"
+    save_path = f"/mnt/hdd_6tb/jh2020/processed_car"
 
     label_preprocess(save_path, plate_json_path, phase = phase)
     #image_preprocess(save_path, plate_image_path)
