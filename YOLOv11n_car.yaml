@@ -1,0 +1,7 @@
+train: ["../processed_car/train/images", "../processed_car/images"]
+val: ../valid/images
+test: ../test/images
+
+nc: 1
+names:
+  0: car
