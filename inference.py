@@ -6,6 +6,9 @@ from ultralytics import YOLO
 from tqdm import tqdm
 import argparse
 
+'''
+동영상을 대상으로 frame을 추출하여 inference를 한 뒤 저장하는 코드
+'''
 
 def get_pred_from_video(file_path, save_path, img_per_sec):
     
