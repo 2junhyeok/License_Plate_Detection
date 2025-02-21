@@ -12,6 +12,9 @@ from tqdm import tqdm
 
 
 def image_resize(img):
+    '''
+    가장 긴 변의 길이를 640으로 resize
+    '''
     img_size = img.size
     if img_size[0] > img_size[1]:
         img_resized = img.resize((640, round(640*img_size[1]/img_size[0]))) # size(tuple)
@@ -24,7 +27,7 @@ def image_preprocess(save_path, plate_path): # ..data/image/plate
     img_path_lst = glob.glob(plate_path+'/**/*.jpg', recursive=True)
     img_path_lst = natsort.natsorted(img_path_lst)
     cnt = 1
-    for img_path in img_path_lst:
+    for img_path in tqdm(img_path_lst):
         img = Image.open(img_path)
         img_resized = image_resize(img)
         img_resized.save(f'{save_path}/images/image{cnt}.png', 'png')
