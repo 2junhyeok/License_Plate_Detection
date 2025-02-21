@@ -100,26 +100,28 @@ class Forward:
         Args:
             result_plate: resized crop img에 대한 yolo's output
         Returns:
-            resize좌표로 스케일링
+            orig이미지 좌표로 스케일링
         '''
-        crop_width, crop_height = result_plate.orig_shape
-        resized_width, resized_height = resized_shape
+        orig_width = self.img.size[0]
+        orig_height = self.img.size[1]
+        crop_width = result_plate.orig_shape[0]
+        crop_height = result_plate.orig_shape[1]
         
-        scaling_factor_x = crop_width / resized_width
-        scaling_factor_y = crop_height / resized_height
+        scaling_factor_r = crop_width/orig_width
+        scaling_factor_c = crop_height/orig_height
         
         xyxy = torch.tensor(result_plate.boxes.xyxy)
         xywh = torch.tensor(result_plate.boxes.xywh)
         
-        xyxy[:,0] *= scaling_factor_x
-        xyxy[:,1] *= scaling_factor_y
-        xyxy[:,2] *= scaling_factor_x
-        xyxy[:,3] *= scaling_factor_y
+        xyxy[:,0] *= scaling_factor_r
+        xyxy[:,1] *= scaling_factor_c
+        xyxy[:,2] *= scaling_factor_r
+        xyxy[:,3] *= scaling_factor_c
         
-        xywh[:,0] *= scaling_factor_x
-        xywh[:,1] *= scaling_factor_y
-        xywh[:,2] *= scaling_factor_x
-        xywh[:,3] *= scaling_factor_y
+        xywh[:,0] *= scaling_factor_r
+        xywh[:,1] *= scaling_factor_c
+        xywh[:,2] *= scaling_factor_r
+        xywh[:,3] *= scaling_factor_c
         
         result_forward = Result()
         
@@ -185,4 +187,3 @@ if __name__ == "__main__":
     img = Image.open(orig_img_path)
     result = forward(img)
     result.image.save('car_crop.png', 'png')
-    
