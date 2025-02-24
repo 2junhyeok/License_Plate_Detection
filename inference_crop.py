@@ -53,83 +53,69 @@ class Forward:
         Args:
             result_car: 원본 이미지에 대한 yolo_car's output
         Returns:
-            crop된 사이즈의 자동차 이미지지
+            crop된 사이즈의 자동차 이미지
         '''
-        orig_img = self.img.copy()
+        orig_img = self.img.copy()# 원본 이미지
         
         crop_lst = []
+        cnt=0
         for i in result_car.boxes.xyxy:
             crop_img = orig_img.crop(tuple(i.tolist()))
             crop_lst.append(crop_img)
-            
+            cnt +=1
+        
         return crop_lst
     
-    def resize_crop(self, crop_img):
-        '''
-        crop된 이미지를 yolo_crop's input에 맞게 resize
-        Args:
-            img: crop된 이미지
-        Reuturn:
-            yolo_crop's input에 맞는 이미지
-        '''
-        resized_img = Result()
-        resized_img.orig_shape = crop_img.size# crop size
-        resized_img.image = data_utils.image_resize(crop_img)
-        
-        return resized_img# resized crop img
-    
-    def detect_plate(self, resized_lst: list):
+    def detect_plate(self, crop_lst: list):
         '''
         crop된 이미지에서 plate를 검출
         Args:
-            resized_img: resized crop 이미지 객체
+            crop_lst: crop된 차량
         Returns:
-            resized crop 이미지 상에서의 yolo output
+            result_plate: 검출된 번호판
         '''
-        resized_img_lst = []
-        for resized_img in resized_lst:
-            resized_img_lst.append(resized_img.image)
-            
-        result_plate = self.model_crop(resized_img_lst)# inference
+        result_plate = self.model_crop(crop_lst, save=True)# inference
 
         return result_plate# yolo's output
     
-    def scaling(self, result_plate):
+    def scaling(self, result_plate, car_xywh, imgsz=640):
         '''
-        단일 output을 orig image의 좌표로 변환한 객체로 return (1 : 1)
+        plate bbox를 원본 이미지에 맞게 scaling
         Args:
-            result_plate: resized crop img에 대한 yolo's output
+            result_plate: crop img에 대한 yolo's output
+            car_xywh: crop detection bbox's xywh
+            imgsz: yolo input size
         Returns:
-            orig이미지 좌표로 스케일링
+            scaled plate bbox
         '''
-        orig_width = self.img.size[0]
-        orig_height = self.img.size[1]
-        crop_width = result_plate.orig_shape[0]
-        crop_height = result_plate.orig_shape[1]
+        W = car_xywh[2]# car width = 775
+        H = car_xywh[3]# car height= 393
+        xc = result_plate.boxes.xywh[0][0]# plate xc
+        yc = result_plate.boxes.xywh[0][1]# plate yc
+        w = result_plate.boxes.xywh[0][2]# plate width = 46
+        h = result_plate.boxes.xywh[0][3]# plate height= 27
         
-        scaling_factor_r = crop_width/orig_width
-        scaling_factor_c = crop_height/orig_height
+        if W >= H:# 가로가 긴 차량
+            x1 = xc*W/imgsz + W -w/2
+            y1 = yc*W/imgsz + H -h/2
+            w = w*W/imgsz
+            h = h*W/imgsz
+        else:# 세로가 긴 차량
+            x1 = xc*H/imgsz + W -w/2
+            y1 = yc*H/imgsz + H -h/2
+            w = w*H/imgsz
+            h = h*H/imgsz
         
-        xyxy = torch.tensor(result_plate.boxes.xyxy)
-        xywh = torch.tensor(result_plate.boxes.xywh)
+        xyxy = torch.tensor([x1, y1, x1+w, y1+h])# scaled xyxy
+        xywh = torch.tensor([x1+w/2, y1+h/2, w, h])# scaled xywh
         
-        xyxy[:,0] *= scaling_factor_r
-        xyxy[:,1] *= scaling_factor_c
-        xyxy[:,2] *= scaling_factor_r
-        xyxy[:,3] *= scaling_factor_c
+        result_scaled = Result()
         
-        xywh[:,0] *= scaling_factor_r
-        xywh[:,1] *= scaling_factor_c
-        xywh[:,2] *= scaling_factor_r
-        xywh[:,3] *= scaling_factor_c
+        result_scaled.boxes.xyxy = torch.cat((result_scaled.boxes.xyxy, xyxy.unsqueeze(0)), dim=0)
+        result_scaled.boxes.xywh = torch.cat((result_scaled.boxes.xywh, xywh.unsqueeze(0)), dim=0)
+        result_scaled.orig_shape = self.img.size
         
-        result_forward = Result()
-        
-        result_forward.boxes.xyxy = torch.cat((result_forward.boxes.xyxy.to('cuda'), xyxy), dim=0)
-        result_forward.boxes.xywh = torch.cat((result_forward.boxes.xywh.to('cuda'), xywh), dim=0)
-        result_forward.orig_shape = self.img.size
-        
-        return result_forward
+        return result_scaled
 
     def plot(self, results):
         img = self.img.copy()
@@ -148,31 +134,17 @@ class Forward:
         result_car = self.detect_car(img)
         crop_lst = self.crop(result_car)
         
-        car_xyxy = result_car.boxes.xyxy
-        car_xywh = result_car.boxes.xywh
+        results_plate = self.detect_plate(crop_lst)
         
-        resized_img_lst = []
-        for img in crop_lst:
-            resized_img = self.resize_crop(img)
-            resized_img_lst.append(resized_img)
-        
-        result_plate = self.detect_plate(resized_img_lst)
-        
-        results = Result()
-        for i in range(len(resized_img_lst)):
-            result_forward = self.scaling(result_plate[i])
+        results = Result()# final result
+        for i in range(len(crop_lst)):
+            car_xyxy = result_car.boxes.xyxy[i]
+            car_xywh = result_car.boxes.xywh[i]
+            result_scaled = self.scaling(results_plate[i], car_xywh, imgsz=640)
             
-            plate_xyxy = result_plate[i].boxes.xyxy.clone()
-            plate_xywh = result_plate[i].boxes.xywh.clone()
-
-            plate_xyxy[:,:2] += car_xyxy[i,:2]
-            plate_xyxy[:,2:] += car_xyxy[i,:2]
-            plate_xywh[:,:2] += car_xywh[i,:2]
-            
-            results.boxes.xyxy = torch.cat((result_forward.boxes.xyxy, plate_xyxy), dim=0)
-            results.boxes.xywh = torch.cat((result_forward.boxes.xywh, plate_xywh), dim=0)
-            results.boxes.orig_shape = None
-
+            results.boxes.xyxy = torch.cat((results.boxes.xyxy, result_scaled.boxes.xyxy), dim=0)
+            results.boxes.xywh = torch.cat((results.boxes.xywh, result_scaled.boxes.xywh), dim=0)
+        results.boxes.orig_shape = self.img.size
         results.image = self.plot(results)
         
         return results
@@ -183,7 +155,7 @@ if __name__ == "__main__":
     
     forward = Forward(model_car = model_car, model_crop = model_crop)
     
-    orig_img_path = "/mnt/hdd_6tb/jh2020/pred/image58.png"
+    orig_img_path = "/home/yohanban/data/Sample_data/01.source_data/detect_car/교차로/[cr06]호계사거리/02번/C-221005_13_CR06_02_A0062.jpg"
     img = Image.open(orig_img_path)
     result = forward(img)
     result.image.save('car_crop.png', 'png')
