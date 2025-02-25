@@ -88,23 +88,23 @@ class Forward:
         Returns:
             scaled plate bbox
         '''
-        W = car_xywh[2]# car width = 775
-        H = car_xywh[3]# car height= 393
-        xc = result_plate.boxes.xywh[0][0]# plate xc
-        yc = result_plate.boxes.xywh[0][1]# plate yc
-        w = result_plate.boxes.xywh[0][2]# plate width = 46
-        h = result_plate.boxes.xywh[0][3]# plate height= 27
+        W = car_xywh[2]# car bbox width
+        H = car_xywh[3]# car bbox height
+        xc = result_plate.boxes.xywh[0][0]# plate bbox xc
+        yc = result_plate.boxes.xywh[0][1]# plate bbox yc
+        w = result_plate.boxes.xywh[0][2]# plate bbox width
+        h = result_plate.boxes.xywh[0][3]# plate bbox height
         
-        if W >= H:# 가로가 긴 차량
-            x1 = xc*W/imgsz + W -w/2
-            y1 = yc*W/imgsz + H -h/2
-            w = w*W/imgsz
-            h = h*W/imgsz
-        else:# 세로가 긴 차량
-            x1 = xc*H/imgsz + W -w/2
-            y1 = yc*H/imgsz + H -h/2
-            w = w*H/imgsz
-            h = h*H/imgsz
+        scale_factor = max(W/imgsz, H/imgsz)
+        
+        pad_W = (imgsz - W/scale_factor)# if W>H: 0
+        pad_H = (imgsz - H/scale_factor)# if H>H: 0
+        
+        x1 = (xc - pad_W)*scale_factor + W - w/2
+        y1 = (yc - pad_H)*scale_factor + H - h/2
+        w = w*scale_factor
+        h = h*scale_factor
+
         
         xyxy = torch.tensor([x1, y1, x1+w, y1+h])# scaled xyxy
         xywh = torch.tensor([x1+w/2, y1+h/2, w, h])# scaled xywh
