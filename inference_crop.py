@@ -30,7 +30,7 @@ class Forward:
         Returns:
             result_car객체를 출력
         '''
-        output = self.model_car(img, save=True)# inference
+        output = self.model_car(img)# inference
         
         result_car = Result()
         
@@ -67,8 +67,10 @@ class Forward:
         Returns:
             result_plate: 검출된 번호판
         '''
-        
-        result_plate = self.model_crop(crop_lst, save=True)# inference
+        if len(crop_lst)==0:
+            result_plate = Result()
+        if len(crop_lst)>0:
+            result_plate = self.model_crop(crop_lst)# inference
 
         return result_plate# yolo's output
     
@@ -82,26 +84,37 @@ class Forward:
         Returns:
             scaled plate bbox
         '''
-        x1, y1, x2, y2 = result_plate.boxes.xyxy[0]# nms 필요성 O
-        w = x2 - x1
-        h = y2 - y1
-        x1_car, y1_car, x2_car, y2_car = car_xyxy
-        w_car = x2_car-x1_car
-        h_car = y2_car-y1_car
+        if not len(result_plate.boxes.xyxy) > 0:
+            xyxy = torch.empty((0,4))
+            xywh = torch.empty((0,4))
+            
+            result_scaled = Result()
+            
+            result_scaled.boxes.xyxy = torch.cat((result_scaled.boxes.xyxy, xyxy), dim=0)
+            result_scaled.boxes.xywh = torch.cat((result_scaled.boxes.xywh, xywh), dim=0)
+            result_scaled.orig_shape = self.img.size
         
-        x1 = x1 + x1_car
-        y1 = y1 + y1_car
-        x2 = x1 + w
-        y2 = y1 + h
+        else:
+            x1, y1, x2, y2 = result_plate.boxes.xyxy[0]# nms 필요성 O
+            w = x2 - x1
+            h = y2 - y1
+            x1_car, y1_car, x2_car, y2_car = car_xyxy
+            w_car = x2_car-x1_car
+            h_car = y2_car-y1_car
+            
+            x1 = x1 + x1_car
+            y1 = y1 + y1_car
+            x2 = x1 + w
+            y2 = y1 + h
 
-        xyxy = torch.tensor([x1, y1, x2, y2])# scaled xyxy
-        xywh = torch.tensor([x1+w/2, y1+h/2, w, h])# scaled xywh
+            xyxy = torch.tensor([x1, y1, x2, y2])# scaled xyxy
+            xywh = torch.tensor([x1+w/2, y1+h/2, w, h])# scaled xywh
         
-        result_scaled = Result()
-        
-        result_scaled.boxes.xyxy = torch.cat((result_scaled.boxes.xyxy, xyxy.unsqueeze(0)), dim=0)
-        result_scaled.boxes.xywh = torch.cat((result_scaled.boxes.xywh, xywh.unsqueeze(0)), dim=0)
-        result_scaled.orig_shape = self.img.size
+            result_scaled = Result()
+            
+            result_scaled.boxes.xyxy = torch.cat((result_scaled.boxes.xyxy, xyxy.unsqueeze(0)), dim=0)
+            result_scaled.boxes.xywh = torch.cat((result_scaled.boxes.xywh, xywh.unsqueeze(0)), dim=0)
+            result_scaled.orig_shape = self.img.size
         
         return result_scaled
     
