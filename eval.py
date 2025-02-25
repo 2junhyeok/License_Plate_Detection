@@ -42,7 +42,7 @@ def matching(A: torch.tensor,B: torch.tensor, threshold=0.5):
         
     return matched_A, matched_B
 
-def eval(img_path,gt_path, model, mode='PATH'):
+def eval(img_path,gt_path, model, mode='PATH', model_name='base'):
     '''
     img_path, model -> pred
     gt, pred -> matching
@@ -68,7 +68,7 @@ def eval(img_path,gt_path, model, mode='PATH'):
         with open(gt_path) as gt_lst:
             lst = [list(map(float, line.split()[1:])) for line in gt_lst]
 
-            if mode=='IMAGE' and model == 'base':
+            if mode=='IMAGE' and model_name == 'base':
                 A = result[0].boxes.xywh.to(device)
                 A = torch.cat([A[:,:2] - A[:,2:]/2, A[:, 2:]], dim=1)# [xc,yc,w,h]->[x1,y1,w,h]
             else:
@@ -85,22 +85,26 @@ def eval(img_path,gt_path, model, mode='PATH'):
 
 
 if __name__=="__main__":
-    test_img_path = "/mnt/hdd_6tb/jh2020/processed_test/images"
-    test_label_path = "/mnt/hdd_6tb/jh2020/processed_test/labels" # gt
-    model = YOLO("/mnt/hdd_6tb/jh2020/runs/detect/tune/weights/best.pt")
+    test_img_path = "/mnt/hdd_6tb/jh2020/processed_high_res/images"
+    test_label_path = "/mnt/hdd_6tb/jh2020/processed_high_res/labels" # gt
+    model_base = YOLO("/mnt/hdd_6tb/jh2020/runs/detect/tune/weights/best.pt")
     model_car = YOLO("/mnt/hdd_6tb/jh2020/ckpt/YOLOv11n_car.pt")
     model_crop = YOLO("/mnt/hdd_6tb/jh2020/ckpt/YOLOv11n_carcrop.pt")
     
     mode = "IMAGE"# IMAGE, PATH
-    model = "Crop"# Quater, Crop
+    model_name = "Crop"# base, Quater, Crop
     
     if mode=="PATH":
-        if model == "Quater":
-            model = QuaterYOLO(margin=0.1, model=model)
+        if model_name == "Quater":
+            model = QuaterYOLO(margin=0.1, model=model_base)
+            
     elif mode=="IMAGE":
-        if model == "Crop":
+        if model_name == "Crop":
             model = Forward(model_car = model_car, model_crop = model_crop)
-        if model =="base":
-            pass
+            
+        if model_name =="base":
+            model = model_base
+    else:
+        raise ValueError
     
-    print("recall score: ", eval(test_img_path, test_label_path, model, mode=mode))
+    print("recall score: ", eval(test_img_path, test_label_path, model, mode=mode, model_name=model_name))
