@@ -2,14 +2,7 @@ from dataclasses import dataclass, field
 from ultralytics import YOLO
 from PIL import ImageFont, Image, ImageDraw
 import torch
-import data_utils
 import os
-'''
-차량을 탐지한 후 crop한 이미지에 대해 plate탐지
-todo:
-    3. 최종 result에 대한 nms
-'''
-os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 
 @dataclass
 class Boxes:
@@ -74,11 +67,12 @@ class Forward:
         Returns:
             result_plate: 검출된 번호판
         '''
+        
         result_plate = self.model_crop(crop_lst, save=True)# inference
 
         return result_plate# yolo's output
     
-    def scaling(self, result_plate, car_xywh, imgsz=640):
+    def scaling(self, result_plate, car_xyxy, imgsz=640):
         '''
         plate bbox를 원본 이미지에 맞게 scaling
         Args:
@@ -88,25 +82,19 @@ class Forward:
         Returns:
             scaled plate bbox
         '''
-        W = car_xywh[2]# car bbox width
-        H = car_xywh[3]# car bbox height
-        xc = result_plate.boxes.xywh[0][0]# plate bbox xc
-        yc = result_plate.boxes.xywh[0][1]# plate bbox yc
-        w = result_plate.boxes.xywh[0][2]# plate bbox width
-        h = result_plate.boxes.xywh[0][3]# plate bbox height
+        x1, y1, x2, y2 = result_plate.boxes.xyxy[0]# nms 필요성 O
+        w = x2 - x1
+        h = y2 - y1
+        x1_car, y1_car, x2_car, y2_car = car_xyxy
+        w_car = x2_car-x1_car
+        h_car = y2_car-y1_car
         
-        scale_factor = max(W/imgsz, H/imgsz)
-        
-        pad_W = (imgsz - W/scale_factor)# if W>H: 0
-        pad_H = (imgsz - H/scale_factor)# if H>H: 0
-        
-        x1 = (xc - pad_W)*scale_factor + W - w/2
-        y1 = (yc - pad_H)*scale_factor + H - h/2
-        w = w*scale_factor
-        h = h*scale_factor
+        x1 = x1 + x1_car
+        y1 = y1 + y1_car
+        x2 = x1 + w
+        y2 = y1 + h
 
-        
-        xyxy = torch.tensor([x1, y1, x1+w, y1+h])# scaled xyxy
+        xyxy = torch.tensor([x1, y1, x2, y2])# scaled xyxy
         xywh = torch.tensor([x1+w/2, y1+h/2, w, h])# scaled xywh
         
         result_scaled = Result()
@@ -116,18 +104,18 @@ class Forward:
         result_scaled.orig_shape = self.img.size
         
         return result_scaled
-
-    def plot(self, results):
-        img = self.img.copy()
+    
+    @staticmethod
+    def plot(image, results):
         bboxes = results.boxes.xyxy
         bboxes = bboxes.to('cpu').numpy()
         font = ImageFont.load_default()
         
-        draw = ImageDraw.Draw(img)
+        draw = ImageDraw.Draw(image)
         for bbox in bboxes:
             draw.rectangle((bbox), outline="red", width=2)
 
-        return img
+        return image
     
     def __call__(self, img):
         self.img = img
@@ -140,12 +128,12 @@ class Forward:
         for i in range(len(crop_lst)):
             car_xyxy = result_car.boxes.xyxy[i]
             car_xywh = result_car.boxes.xywh[i]
-            result_scaled = self.scaling(results_plate[i], car_xywh, imgsz=640)
+            result_scaled = self.scaling(results_plate[i], car_xyxy, imgsz=640)
             
             results.boxes.xyxy = torch.cat((results.boxes.xyxy, result_scaled.boxes.xyxy), dim=0)
             results.boxes.xywh = torch.cat((results.boxes.xywh, result_scaled.boxes.xywh), dim=0)
         results.boxes.orig_shape = self.img.size
-        results.image = self.plot(results)
+        results.image = Forward.plot(img, results)
         
         return results
     
