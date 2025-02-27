@@ -11,7 +11,7 @@ search_space={
 
 # Train the model
 train_results = model.tune(
-    data="/mnt/hdd_6tb/jh2020/plateYOLO11n.yaml",
+    data="../car_plate_od/config/plateYOLO11n.yaml",
     epochs=130,
     iterations=300,
     optimizer="AdamW",

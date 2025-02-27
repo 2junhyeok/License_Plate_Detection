@@ -8,9 +8,6 @@ import numpy as np
 from PIL import Image
 from tqdm import tqdm
 
-############### image ###############
-
-
 def image_resize(img):
     '''
     가장 긴 변의 길이를 640으로 resize
@@ -33,8 +30,6 @@ def image_preprocess(save_path, plate_path): # ..data/image/plate
         img_resized.save(f'{save_path}/images/image{cnt}.png', 'png')
         cnt += 1
     
-
-############### label ###############
 # img size에 맞게 normalize
 def bbox_normalize(bbox, img_size):
     x, y, w, h = bbox
@@ -149,5 +144,5 @@ if __name__=="__main__":
     plate_json_path = "/mnt/hdd_6tb/seungeun/HuNature/data/label/car"
     save_path = f"/mnt/hdd_6tb/jh2020/processed_car"
 
-    label_preprocess(save_path, plate_json_path, phase = phase)
+    #label_preprocess(save_path, plate_json_path, phase = phase)
     #image_preprocess(save_path, plate_image_path)

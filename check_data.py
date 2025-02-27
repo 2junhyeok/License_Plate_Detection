@@ -7,6 +7,10 @@ import os
 import re
 import natsort
 
+'''
+데이터 셋에서 랜덤하게 10개를 샘플링하여 bbox 위치가 알맞는지 확인하는 코드
+'''
+
 img_path = "/mnt/hdd_6tb/jh2020/processed_test/images/"
 label_path = "/mnt/hdd_6tb/jh2020/processed_test/labels/"
 plotted_path = "/mnt/hdd_6tb/jh2020/processed_original/plotted_image/"

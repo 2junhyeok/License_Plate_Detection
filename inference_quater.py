@@ -228,15 +228,8 @@ class QuaterYOLO:
     
 
 if __name__=="__main__":
-    model = YOLO("/mnt/hdd_6tb/jh2020/runs/detect/tune/weights/best.pt")
+    model = YOLO("../car_plate_od/ckpt/YOLOv11n_plate.pt")
     custom_model = QuaterYOLO(margin=0.1, model=model)
-    #org_img_path = "/mnt/hdd_6tb/jh2020/pred/image58.png"
-    #img = custom_model.infer(org_img_path)
-    #img.save('test_quater.png', 'png')
-
-    img_path = "/mnt/hdd_6tb/jh2020/processed_test/images"
-    save_path = "/mnt/hdd_6tb/jh2020/runs/detect/predict5"
-    img_path_lst = glob.glob(img_path+'/**/*.png', recursive=True)
-    for i,path in enumerate(natsort.natsorted(img_path_lst)):
-        result = custom_model(path)
-        result.image.save(f"{save_path}/image{i}.png", "png")
+    org_img_path = "../IMAGE_PATH"
+    img = custom_model.infer(org_img_path)
+    #img.save('test.png', 'png')

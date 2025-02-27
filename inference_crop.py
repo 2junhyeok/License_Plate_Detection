@@ -151,12 +151,12 @@ class Forward:
         return results
     
 if __name__ == "__main__":
-    model_car = YOLO("/mnt/hdd_6tb/jh2020/ckpt/YOLOv11n_car.pt")
-    model_crop = YOLO("/mnt/hdd_6tb/jh2020/ckpt/YOLOv11n_carcrop.pt")
+    model_car = YOLO("../car_plate_od/ckpt/YOLOv11n_car.pt")
+    model_crop = YOLO("../car_plate_od/ckpt/YOLOv11n_carcrop.pt")
     
     forward = Forward(model_car = model_car, model_crop = model_crop)
     
-    orig_img_path = "/home/yohanban/data/Sample_data/01.source_data/detect_car/교차로/[cr06]호계사거리/02번/C-221005_13_CR06_02_A0062.jpg"
+    orig_img_path = "../IMAGE_PATH"
     img = Image.open(orig_img_path)
     result = forward(img)
-    result.image.save('car_crop.png', 'png')
+    #result.image.save('test.png', 'png')

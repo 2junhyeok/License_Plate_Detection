@@ -87,9 +87,9 @@ def eval(img_path,gt_path, model, mode='PATH', model_name='base'):
 if __name__=="__main__":
     test_img_path = "/mnt/hdd_6tb/jh2020/processed_high_res/images"
     test_label_path = "/mnt/hdd_6tb/jh2020/processed_high_res/labels" # gt
-    model_base = YOLO("/mnt/hdd_6tb/jh2020/runs/detect/tune/weights/best.pt")
-    model_car = YOLO("/mnt/hdd_6tb/jh2020/ckpt/YOLOv11n_car.pt")
-    model_crop = YOLO("/mnt/hdd_6tb/jh2020/ckpt/YOLOv11n_carcrop.pt")
+    model_base = YOLO("../car_plate_od/ckpt/YOLOv11n_plate.pt")
+    model_car = YOLO("../car_plate_od/ckpt/YOLOv11n_car.pt")
+    model_crop = YOLO("../car_plate_od/ckpt/YOLOv11n_carcrop.pt")
     
     mode = "IMAGE"# IMAGE, PATH
     model_name = "Crop"# base, Quater, Crop

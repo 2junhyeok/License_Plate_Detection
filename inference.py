@@ -55,8 +55,8 @@ def get_args():
 
 
 if __name__ == "__main__":
-    file_path = "/mnt/hdd_6tb/jh2020/sample_video/cctv50mm.mp4"
-    save_path = "/mnt/hdd_6tb/jh2020/pred"
+    file_path = "../sample_video/cctv50mm.mp4"
+    save_path = "../frames"
     args = get_args()
     get_pred_from_video(file_path,
                          save_path,
